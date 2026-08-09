@@ -30,8 +30,9 @@ def download_video_ytdlp(video_id: str) -> str:
     # Prepara os cookies
     cookie_path = setup_cookies()
 
+    # CORREÇÃO APLICADA AQUI: Formato simplificado para evitar erro de indisponibilidade
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'best[ext=mp4]/best', 
         'outtmpl': output_filename,
         'quiet': True,
         'no_warnings': True,
