@@ -51,8 +51,7 @@ def download_short_mp4(video_id: str) -> str:
             f.write(cookies_content)
     
     ydl_opts = {
-        # Força o YouTube a entregar especificamente vídeo em H.264 (avc1) e áudio m4a, 
-        # que é o formato universal que o editor do TikTok lê sem dar tela preta!
+        # Força o YouTube a entregar especificamente vídeo em H.264 (avc1) e áudio m4a para evitar tela preta no TikTok
         'format': 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'merge_output_format': 'mp4',
         'outtmpl': output_filename,
@@ -139,6 +138,11 @@ def check_new_shorts():
         title = item["snippet"].get("title", "Sem título")
         
         print(f"[-] Analisando o vídeo: '{title}' (ID: {video_id})", flush=True)
+        
+        # Pula temporariamente o vídeo travado no anti-spam do TikTok para destravar o fluxo
+        if video_id == "RZORo8iV9UI":
+            print(f"   -> [PULADO] Ignorando vídeo travado no anti-spam do TikTok.", flush=True)
+            continue
         
         if is_video_processed(video_id):
             print(f"   -> [IGNORADO] O vídeo já está no banco de dados como processado.", flush=True)
