@@ -51,10 +51,9 @@ def download_short_mp4(video_id: str) -> str:
             f.write(cookies_content)
     
     ydl_opts = {
-        # --- AQUI ESTÁ A CORREÇÃO DE FORMATO PARA EVITAR O ERRO DO YT-DLP ---
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        # Opção nuclear: pega o melhor arquivo único (MP4) que já tenha vídeo e áudio juntos
+        'format': 'best[ext=mp4]/best',
         'outtmpl': output_filename,
-        'merge_output_format': 'mp4',
         'quiet': True,
         'no_warnings': True
     }
