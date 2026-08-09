@@ -51,8 +51,9 @@ def download_short_mp4(video_id: str) -> str:
             f.write(cookies_content)
     
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'bestvideo+bestaudio/best',
         'outtmpl': output_filename,
+        'merge_output_format': 'mp4',
         'quiet': True,
         'no_warnings': True
     }
