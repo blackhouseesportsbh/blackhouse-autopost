@@ -2,7 +2,6 @@ import os
 import time
 import threading
 import requests
-import yt_dlp
 from fastapi import FastAPI
 from database import init_db, is_video_processed, mark_video_processed
 
@@ -13,26 +12,44 @@ TIKTOK_ACCESS_TOKEN = os.getenv("TIKTOK_ACCESS_TOKEN", "")
 
 app = FastAPI(title="BlackHouse Esports AutoPost")
 
-def download_video_ytdlp(video_id: str) -> str:
-    """Baixa o vídeo usando a biblioteca oficial do yt-dlp com autenticação via cookies"""
+def download_video_cobalt(video_id: str) -> str:
+    """Baixa o vídeo usando a API pública do Cobalt, evitando bloqueios de bot do YouTube"""
     output_filename = f"short_{video_id}.mp4"
     url = f"https://www.youtube.com/watch?v={video_id}"
-
-    # Configurações do yt-dlp para baixar a melhor qualidade em mp4
-    ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'outtmpl': output_filename,
-        'cookiefile': 'cookies.txt',  # O arquivo de cookies deve estar na mesma pasta deste script no Railway
-        'quiet': True,
-        'no_warnings': True,
+    
+    api_url = "https://api.cobalt.tools/api/json"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        return output_filename
-    except Exception as e:
-        raise Exception(f"Erro no yt-dlp: {e}")
+    payload = {
+        "url": url,
+        "vCodec": "h264" # Garante o formato mp4 padrão aceito pelo TikTok
+    }
+    
+    print(f"[-] Solicitando download via Cobalt para: {video_id}", flush=True)
+    res = requests.post(api_url, json=payload, headers=headers)
+    
+    if res.status_code != 200:
+        raise Exception(f"Erro na API do Cobalt (Status {res.status_code}): {res.text}")
+        
+    data = res.json()
+    
+    # O Cobalt retorna o link direto de download no campo "url"
+    download_url = data.get("url")
+    if not download_url:
+        raise Exception(f"Falha ao obter link de download no Cobalt: {data}")
+    
+    print(f"[-] Baixando arquivo mp4...", flush=True)
+    video_res = requests.get(download_url, stream=True)
+    
+    with open(output_filename, "wb") as f:
+        for chunk in video_res.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+                
+    return output_filename
 
 def check_new_shorts():
     uploads_playlist_id = "UU" + YOUTUBE_CHANNEL_ID[2:]
@@ -41,7 +58,7 @@ def check_new_shorts():
     try:
         items = requests.get(url).json().get("items", [])
     except Exception as e: 
-        print(f"[!] Erro ao buscar vídeos na API do YouTube: {e}", flush=True)
+        print(f"[!] Erro ao buscar vídeos na API: {e}", flush=True)
         return
     
     for item in items:
@@ -51,37 +68,30 @@ def check_new_shorts():
         
         print(f"[-] Analisando: {video_id}", flush=True)
         try:
-            # Substituída a função antiga pela nova do yt-dlp
-            mp4_file = download_video_ytdlp(video_id)
+            mp4_file = download_video_cobalt(video_id)
             print(f"[✓] Vídeo baixado! (Pronto para upload TikTok)", flush=True)
             
             # ---------------------------------------------------------
-            # AQUI VOCÊ MANTÉM SEU CÓDIGO DE UPLOAD PARA O TIKTOK
+            # SEU CÓDIGO DE UPLOAD PARA O TIKTOK VAI AQUI
             # ---------------------------------------------------------
             
-            # Limpa o arquivo local após o upload para não lotar o servidor
+            # Limpeza do arquivo após upload
             if os.path.exists(mp4_file):
                 os.remove(mp4_file)
                 
             mark_video_processed(video_id, "Download Sucesso", "OK")
             
         except Exception as e:
-            print(f"[!] Erro crítico ao processar o vídeo {video_id}: {e}", flush=True)
-            # Se der erro, marca como erro pra não ficar tentando o dia todo
+            print(f"[!] Erro ao baixar o vídeo {video_id}: {e}", flush=True)
             mark_video_processed(video_id, "Erro download", "ERRO")
 
 def poll_loop():
     while True:
-        try: 
-            check_new_shorts()
-        except Exception as e: 
-            print(f"[!] Erro no loop principal: {e}", flush=True)
-        
-        # Aguarda 5 minutos antes de checar o canal novamente
+        try: check_new_shorts()
+        except: pass
         time.sleep(300)
 
 @app.on_event("startup")
 def startup_event():
     init_db()
-    # Inicia a thread em background para não travar a API do FastAPI
     threading.Thread(target=poll_loop, daemon=True).start()
