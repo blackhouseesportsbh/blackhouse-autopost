@@ -7,12 +7,12 @@ import yt_dlp
 from fastapi import FastAPI
 from database import init_db, is_video_processed, mark_video_processed
 
-# Configurações com suas credenciais
-YOUTUBE_API_KEY = "AIzaSyDteDUQSM0KSnQG_4JYFgYVEOHdi75P5Pg"
-YOUTUBE_CHANNEL_ID = "UCiRQPr07mu_mS-4SP6HMqvQ"
+# Configurações com suas credenciais (BUSQUE SEMPRE DO .ENV OU VARIÁVEIS DA RAILWAY)
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
+YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "UCiRQPr07mu_mS-4SP6HMqvQ")
 
-TIKTOK_CLIENT_KEY = "awqz2c2pjmuwwnzf"
-TIKTOK_CLIENT_SECRET = "LAsYwINgPl7tohKq8HDR3A1KgruSFi3y"
+TIKTOK_CLIENT_KEY = os.getenv("TIKTOK_CLIENT_KEY", "")
+TIKTOK_CLIENT_SECRET = os.getenv("TIKTOK_CLIENT_SECRET", "")
 TIKTOK_ACCESS_TOKEN = os.getenv("TIKTOK_ACCESS_TOKEN", "")
 
 app = FastAPI(title="BlackHouse Esports AutoPost")
@@ -38,8 +38,7 @@ def is_youtube_short(video_id: str) -> tuple[bool, str]:
     
     return is_short, title
 
-
- def download_short_mp4(video_id: str) -> str:
+def download_short_mp4(video_id: str) -> str:
     output_filename = f"short_{video_id}.mp4"
     url = f"https://www.youtube.com/shorts/{video_id}"
     
@@ -52,12 +51,9 @@ def is_youtube_short(video_id: str) -> tuple[bool, str]:
             f.write(cookies_content)
     
     ydl_opts = {
-        'format': 'b/best',
+        'format': 'bestvideo+bestaudio/best',
         'outtmpl': output_filename,
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4',
-        }],
+        'merge_output_format': 'mp4',
         'quiet': True,
         'no_warnings': True
     }
