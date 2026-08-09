@@ -51,8 +51,9 @@ def download_short_mp4(video_id: str) -> str:
             f.write(cookies_content)
     
     ydl_opts = {
-        # Baixa a melhor imagem e o melhor áudio separados e pede pro FFmpeg costurar os dois!
-        'format': 'bestvideo+bestaudio/best',
+        # Força o YouTube a entregar especificamente vídeo em H.264 (avc1) e áudio m4a, 
+        # que é o formato universal que o editor do TikTok lê sem dar tela preta!
+        'format': 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'merge_output_format': 'mp4',
         'outtmpl': output_filename,
         'quiet': True,
