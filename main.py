@@ -51,8 +51,9 @@ def download_short_mp4(video_id: str) -> str:
             f.write(cookies_content)
     
     ydl_opts = {
-        # 'best' puro: pega o melhor arquivo de vídeo e áudio combinados, seja ele qual for (mp4, webm, mkv)
-        'format': 'best',
+        # Baixa a melhor imagem e o melhor áudio separados e pede pro FFmpeg costurar os dois!
+        'format': 'bestvideo+bestaudio/best',
+        'merge_output_format': 'mp4',
         'outtmpl': output_filename,
         'quiet': True,
         'no_warnings': True
