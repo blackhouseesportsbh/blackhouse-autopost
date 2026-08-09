@@ -1,101 +1,49 @@
-import os
-import time
-import threading
-import requests
-import yt_dlp
-from fastapi import FastAPI
-from database import init_db, is_video_processed, mark_video_processed
+import sqlite3
+import datetime
 
-# Configurações
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
-YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "UCiRQPr07mu_mS-4SP6HMqvQ")
-TIKTOK_ACCESS_TOKEN = os.getenv("TIKTOK_ACCESS_TOKEN", "")
+# Nome do arquivo do banco de dados que será criado no Railway
+DB_NAME = "videos.db"
 
-app = FastAPI(title="BlackHouse Esports AutoPost")
+def get_connection():
+    # check_same_thread=False é importante porque usamos uma thread separada para o loop no FastAPI
+    return sqlite3.connect(DB_NAME, check_same_thread=False)
 
-def setup_cookies():
-    """Gera o arquivo cookies.txt a partir da variável de ambiente do Railway"""
-    cookies_content = os.getenv("YOUTUBE_COOKIES", "")
-    if cookies_content:
-        with open("cookies.txt", "w") as f:
-            f.write(cookies_content)
-        return "cookies.txt"
-    return None
+def init_db():
+    """Inicializa o banco de dados e cria a tabela se ela não existir."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS processed_videos (
+            video_id TEXT PRIMARY KEY,
+            status TEXT,
+            message TEXT,
+            processed_at TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-def download_video_ytdlp(video_id: str) -> str:
-    """Baixa o vídeo usando yt-dlp, simulando um cliente Android para burlar bloqueios"""
-    url = f"https://www.youtube.com/watch?v={video_id}"
-    cookie_path = setup_cookies()
-
-    # Configuração definitiva com bypass de bloqueio e FFmpeg
-    ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
-        'outtmpl': f'short_{video_id}.%(ext)s', 
-        'quiet': True,
-        'no_warnings': True,
-        # O TRUQUE MÁGICO: Engana o YouTube dizendo que a requisição vem do app de celular
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
-    }
-
-    if cookie_path:
-        ydl_opts['cookiefile'] = cookie_path
-    else:
-        print("[!] AVISO: Variável YOUTUBE_COOKIES não encontrada no Railway.", flush=True)
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Baixa o vídeo, junta com o áudio via FFmpeg e pega o nome final do arquivo
-            info_dict = ydl.extract_info(url, download=True)
-            downloaded_file = ydl.prepare_filename(info_dict)
-            
-        return downloaded_file
-    except Exception as e:
-        raise Exception(f"Erro no yt-dlp: {e}")
-
-def check_new_shorts():
-    uploads_playlist_id = "UU" + YOUTUBE_CHANNEL_ID[2:]
-    url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={uploads_playlist_id}&maxResults=5&key={YOUTUBE_API_KEY}"
+def is_video_processed(video_id: str) -> bool:
+    """Verifica se o vídeo já consta no banco de dados para não baixar de novo."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM processed_videos WHERE video_id = ?", (video_id,))
+    result = cursor.fetchone()
+    conn.close()
     
-    try:
-        items = requests.get(url).json().get("items", [])
-    except Exception as e: 
-        print(f"[!] Erro ao buscar vídeos na API do YouTube: {e}", flush=True)
-        return
+    # Retorna True se achou algo, False se não achou
+    return result is not None
+
+def mark_video_processed(video_id: str, message: str, status: str):
+    """Marca o vídeo como processado (seja com SUCESSO ou ERRO)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now = datetime.datetime.now().isoformat()
     
-    for item in items:
-        video_id = item["snippet"]["resourceId"]["videoId"]
-        if is_video_processed(video_id): 
-            continue
-        
-        print(f"[-] Analisando: {video_id}", flush=True)
-        try:
-            downloaded_file = download_video_ytdlp(video_id)
-            print(f"[✓] Vídeo baixado: {downloaded_file}! (Pronto para upload TikTok)", flush=True)
-            
-            # ---------------------------------------------------------
-            # SEU CÓDIGO DE UPLOAD PARA O TIKTOK VAI AQUI
-            # ---------------------------------------------------------
-            
-            # Limpa o arquivo local para não lotar o disco do Railway
-            if os.path.exists(downloaded_file):
-                os.remove(downloaded_file)
-                
-            mark_video_processed(video_id, "Download Sucesso", "OK")
-            
-        except Exception as e:
-            print(f"[!] Erro crítico ao processar o vídeo {video_id}: {e}", flush=True)
-            mark_video_processed(video_id, "Erro download", "ERRO")
-
-def poll_loop():
-    while True:
-        try: 
-            check_new_shorts()
-        except Exception as e: 
-            print(f"[!] Erro no loop principal: {e}", flush=True)
-        
-        time.sleep(300)
-
-@app.on_event("startup")
-def startup_event():
-    init_db()
-    threading.Thread(target=poll_loop, daemon=True).start()
+    cursor.execute('''
+        INSERT OR REPLACE INTO processed_videos (video_id, status, message, processed_at)
+        VALUES (?, ?, ?, ?)
+    ''', (video_id, status, message, now))
+    
+    conn.commit()
+    conn.close()
