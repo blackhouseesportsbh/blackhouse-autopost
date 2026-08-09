@@ -113,39 +113,63 @@ def upload_to_tiktok(video_path: str, title: str) -> str:
     return publish_id
 
 def check_new_shorts():
+    print("[*] Bateu o tempo! Buscando vídeos na API do YouTube...", flush=True)
     uploads_playlist_id = "UU" + YOUTUBE_CHANNEL_ID[2:]
     url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={uploads_playlist_id}&maxResults=5&key={YOUTUBE_API_KEY}"
-    res = requests.get(url).json()
     
-    for item in res.get("items", []):
+    try:
+        res = requests.get(url).json()
+    except Exception as e:
+        print(f"[!] Erro ao tentar conectar com a API do YouTube: {e}", flush=True)
+        return
+
+    items = res.get("items", [])
+    print(f"[*] O YouTube retornou {len(items)} vídeos na playlist.", flush=True)
+
+    for item in items:
         video_id = item["snippet"]["resourceId"]["videoId"]
+        title = item["snippet"].get("title", "Sem título")
+        
+        print(f"[-] Analisando o vídeo: '{title}' (ID: {video_id})", flush=True)
         
         if is_video_processed(video_id):
+            print(f"   -> [IGNORADO] O vídeo já está no banco de dados como processado.", flush=True)
             continue
 
-        is_short, title = is_youtube_short(video_id)
+        print(f"   -> Vídeo não processado! Verificando se atende aos requisitos de Short...", flush=True)
+        is_short, short_title = is_youtube_short(video_id)
+        
         if not is_short:
+            print(f"   -> [IGNORADO] Não é um Short válido (ou tem mais de 3 minutos).", flush=True)
             continue
 
-        print(f"[+] Novo Short encontrado: {title} ({video_id})")
+        print(f"[+] NOVO SHORT APROVADO: '{short_title}'! Iniciando o yt-dlp para download...", flush=True)
         mp4_file = None
         try:
             mp4_file = download_short_mp4(video_id)
-            publish_id = upload_to_tiktok(mp4_file, title)
-            mark_video_processed(video_id, title, publish_id)
-            print(f"[✓] Vídeo enviado com sucesso para a caixa de entrada do TikTok!")
+            print(f"   -> [✓] Download concluído! Iniciando comunicação com a API do TikTok...", flush=True)
+            
+            publish_id = upload_to_tiktok(mp4_file, short_title)
+            print(f"   -> [✓] Upload feito com sucesso! Salvando no banco de dados...", flush=True)
+            
+            mark_video_processed(video_id, short_title, publish_id)
+            print(f"[✓✓✓] SUCESSO TOTAL! Vídeo enviado para a caixa de entrada do TikTok!", flush=True)
         except Exception as e:
-            print(f"[!] Erro ao processar o vídeo {video_id}: {e}")
+            print(f"[!] ERRO ao processar ou enviar o vídeo {video_id}: {e}", flush=True)
         finally:
             if mp4_file and os.path.exists(mp4_file):
                 os.remove(mp4_file)
+                print(f"   -> Faxina: Arquivo temporário {mp4_file} apagado do servidor.", flush=True)
 
 def poll_loop():
+    print("[*] Serviço de AutoPost iniciado! Começando o monitoramento...", flush=True)
     while True:
         try:
             check_new_shorts()
+            print("[*] Ciclo finalizado. Bot indo dormir por 2 minutos...", flush=True)
         except Exception as e:
-            print(f"[!] Erro na verificação: {e}")
+            print(f"[!] Erro fatal no ciclo de verificação: {e}", flush=True)
+        
         time.sleep(120)  # Checa a cada 2 minutos
 
 @app.on_event("startup")
