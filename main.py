@@ -23,14 +23,13 @@ def setup_cookies():
     return None
 
 def download_video_ytdlp(video_id: str) -> str:
-    """Baixa o vídeo usando yt-dlp sem forçar formatos específicos"""
+    """Baixa o vídeo usando yt-dlp sem forçar formatos, deixando ele usar o FFmpeg para juntar áudio e vídeo"""
     url = f"https://www.youtube.com/watch?v={video_id}"
     cookie_path = setup_cookies()
 
-    # 'b' significa: pega o melhor arquivo único disponível no servidor do YouTube e não me enche o saco
+    # Sem a linha 'format', o yt-dlp baixa a melhor qualidade de vídeo e áudio separados e junta sozinho
     ydl_opts = {
-        'format': 'b', 
-        'outtmpl': f'short_{video_id}.%(ext)s', # Deixa o yt-dlp decidir a extensão (.mp4, .webm, etc)
+        'outtmpl': f'short_{video_id}.%(ext)s', 
         'quiet': True,
         'no_warnings': True,
     }
@@ -42,7 +41,7 @@ def download_video_ytdlp(video_id: str) -> str:
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Baixa o vídeo e extrai as informações para saber o nome exato do arquivo gerado
+            # Baixa o vídeo e extrai as informações para saber o nome exato do arquivo gerado após a junção
             info_dict = ydl.extract_info(url, download=True)
             downloaded_file = ydl.prepare_filename(info_dict)
             
