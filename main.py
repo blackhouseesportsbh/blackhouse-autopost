@@ -50,16 +50,27 @@ def download_short_mp4(video_id: str) -> str:
         with open(cookie_path, "w", encoding="utf-8") as f:
             f.write(cookies_content)
     
+    # Opções blindadas para enganar o bloqueio de IP de datacenter do YouTube
     ydl_opts = {
-        # Força o YouTube a entregar especificamente vídeo em H.264 (avc1) e áudio m4a para evitar tela preta no TikTok
         'format': 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'merge_output_format': 'mp4',
         'outtmpl': output_filename,
         'quiet': True,
-        'no_warnings': True
+        'no_warnings': True,
+        # Simula um navegador real do Windows para evitar o bloqueio de "bot"
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        # Força o extrator a usar parâmetros de cliente web padrão
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['web', 'mweb']
+            }
+        }
     }
     
-    # Se gerou o arquivo de cookies, passa para o yt-dlp
+    # Se gerou o arquivo de cookies, injeta nas opções
     if cookie_path and os.path.exists(cookie_path):
         ydl_opts['cookiefile'] = cookie_path
     
@@ -139,7 +150,7 @@ def check_new_shorts():
         
         print(f"[-] Analisando o vídeo: '{title}' (ID: {video_id})", flush=True)
         
-        # Pula temporariamente os vídeos travados no anti-spam do TikTok para destravar o fluxo
+        # Pula temporariamente os vídeos travados no anti-spam do TikTok
         if video_id in ["RZORo8iV9UI", "5KUSGlieyj4", "IKfixyS_Ofo"]:
             print(f"   -> [PULADO] Ignorando vídeo travado no anti-spam do TikTok.", flush=True)
             continue
@@ -155,7 +166,7 @@ def check_new_shorts():
             print(f"   -> [IGNORADO] Não é um Short válido (ou tem mais de 3 minutos).", flush=True)
             continue
 
-        print(f"[+] NOVO SHORT APROVADO: '{short_title}'! Iniciando o yt-dlp para download...", flush=True)
+        print(f"[+] NOVO SHORT APROVADO: '{short_title}'! Iniciando o yt-dlp blindado para download...", flush=True)
         mp4_file = None
         try:
             mp4_file = download_short_mp4(video_id)
