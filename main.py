@@ -139,8 +139,8 @@ def check_new_shorts():
         
         print(f"[-] Analisando o vídeo: '{title}' (ID: {video_id})", flush=True)
         
-        # Pula temporariamente o vídeo travado no anti-spam do TikTok para destravar o fluxo
-        if video_id == "RZORo8iV9UI":
+        # Pula temporariamente os vídeos travados no anti-spam do TikTok para destravar o fluxo
+        if video_id in ["RZORo8iV9UI", "5KUSGlieyj4"]:
             print(f"   -> [PULADO] Ignorando vídeo travado no anti-spam do TikTok.", flush=True)
             continue
         
