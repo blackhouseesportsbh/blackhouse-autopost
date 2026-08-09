@@ -23,31 +23,30 @@ def setup_cookies():
     return None
 
 def download_video_ytdlp(video_id: str) -> str:
-    """Baixa o vídeo usando yt-dlp com autenticação via cookies"""
-    output_filename = f"short_{video_id}.mp4"
+    """Baixa o vídeo usando yt-dlp sem forçar formatos específicos"""
     url = f"https://www.youtube.com/watch?v={video_id}"
-
-    # Prepara os cookies
     cookie_path = setup_cookies()
 
-    # CORREÇÃO APLICADA AQUI: Formato simplificado para evitar erro de indisponibilidade
+    # 'b' significa: pega o melhor arquivo único disponível no servidor do YouTube e não me enche o saco
     ydl_opts = {
-        'format': 'best[ext=mp4]/best', 
-        'outtmpl': output_filename,
+        'format': 'b', 
+        'outtmpl': f'short_{video_id}.%(ext)s', # Deixa o yt-dlp decidir a extensão (.mp4, .webm, etc)
         'quiet': True,
         'no_warnings': True,
     }
 
-    # Se a variável de cookies existir, injeta no yt-dlp
     if cookie_path:
         ydl_opts['cookiefile'] = cookie_path
     else:
-        print("[!] AVISO: Variável YOUTUBE_COOKIES não encontrada no Railway. O download pode falhar.", flush=True)
+        print("[!] AVISO: Variável YOUTUBE_COOKIES não encontrada no Railway.", flush=True)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        return output_filename
+            # Baixa o vídeo e extrai as informações para saber o nome exato do arquivo gerado
+            info_dict = ydl.extract_info(url, download=True)
+            downloaded_file = ydl.prepare_filename(info_dict)
+            
+        return downloaded_file
     except Exception as e:
         raise Exception(f"Erro no yt-dlp: {e}")
 
@@ -68,16 +67,16 @@ def check_new_shorts():
         
         print(f"[-] Analisando: {video_id}", flush=True)
         try:
-            mp4_file = download_video_ytdlp(video_id)
-            print(f"[✓] Vídeo baixado! (Pronto para upload TikTok)", flush=True)
+            downloaded_file = download_video_ytdlp(video_id)
+            print(f"[✓] Vídeo baixado: {downloaded_file}! (Pronto para upload TikTok)", flush=True)
             
             # ---------------------------------------------------------
             # SEU CÓDIGO DE UPLOAD PARA O TIKTOK VAI AQUI
             # ---------------------------------------------------------
             
             # Limpa o arquivo local para não lotar o disco do Railway
-            if os.path.exists(mp4_file):
-                os.remove(mp4_file)
+            if os.path.exists(downloaded_file):
+                os.remove(downloaded_file)
                 
             mark_video_processed(video_id, "Download Sucesso", "OK")
             
