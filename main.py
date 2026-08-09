@@ -119,6 +119,13 @@ def check_new_shorts():
     
     try:
         res = requests.get(url).json()
+        
+        # --- AQUI ESTÁ A ARMADILHA PARA O ERRO ---
+        if "error" in res:
+            print(f"[!!!] O YOUTUBE RECUSOU A CONEXÃO: {res['error']['message']}", flush=True)
+            print(f"      Código do erro: {res['error']['code']}", flush=True)
+            return
+        
     except Exception as e:
         print(f"[!] Erro ao tentar conectar com a API do YouTube: {e}", flush=True)
         return
