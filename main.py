@@ -23,18 +23,17 @@ def setup_cookies():
     return None
 
 def download_video_ytdlp(video_id: str) -> str:
-    """Baixa o vídeo usando yt-dlp, forçando o formato único e disfarçando de app Android"""
+    """Baixa o vídeo forçando conexão IPv4 para evitar o bloqueio de datacenter do YouTube"""
     url = f"https://www.youtube.com/watch?v={video_id}"
     cookie_path = setup_cookies()
 
-    # Configuração de guerra: arquivo único e exclusivo de celular
     ydl_opts = {
         'format': 'best', 
         'outtmpl': f'short_{video_id}.%(ext)s', 
         'quiet': True,
         'no_warnings': True,
-        # O pulo do gato: Deixamos SÓ 'android'. Tiramos o 'web' pra ele nem tentar a versão bloqueada.
-        'extractor_args': {'youtube': {'player_client': ['android']}}
+        # O SEGREDO AQUI: Força o servidor a usar IPv4. O YouTube bloqueia o IPv6 do Railway por padrão.
+        'source_address': '0.0.0.0'
     }
 
     if cookie_path:
