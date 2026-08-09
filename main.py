@@ -42,6 +42,14 @@ def download_short_mp4(video_id: str) -> str:
     output_filename = f"short_{video_id}.mp4"
     url = f"https://www.youtube.com/shorts/{video_id}"
     
+    # Se a variável de cookies existir na Railway, grava num arquivo temporário
+    cookie_path = None
+    cookies_content = os.getenv("YOUTUBE_COOKIES", "").strip()
+    if cookies_content:
+        cookie_path = "cookies.txt"
+        with open(cookie_path, "w", encoding="utf-8") as f:
+            f.write(cookies_content)
+    
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': output_filename,
@@ -49,8 +57,17 @@ def download_short_mp4(video_id: str) -> str:
         'no_warnings': True
     }
     
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    # Se gerou o arquivo de cookies, passa para o yt-dlp
+    if cookie_path and os.path.exists(cookie_path):
+        ydl_opts['cookiefile'] = cookie_path
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    finally:
+        # Remove o arquivo temporário de cookies depois do download
+        if cookie_path and os.path.exists(cookie_path):
+            os.remove(cookie_path)
         
     return output_filename
 
