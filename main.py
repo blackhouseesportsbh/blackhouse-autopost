@@ -23,15 +23,18 @@ def setup_cookies():
     return None
 
 def download_video_ytdlp(video_id: str) -> str:
-    """Baixa o vídeo usando yt-dlp sem forçar formatos, deixando ele usar o FFmpeg para juntar áudio e vídeo"""
+    """Baixa o vídeo usando yt-dlp, forçando o formato único e disfarçando de app Android"""
     url = f"https://www.youtube.com/watch?v={video_id}"
     cookie_path = setup_cookies()
 
-    # Sem a linha 'format', o yt-dlp baixa a melhor qualidade de vídeo e áudio separados e junta sozinho
+    # Configuração de guerra: arquivo único e exclusivo de celular
     ydl_opts = {
+        'format': 'best', 
         'outtmpl': f'short_{video_id}.%(ext)s', 
         'quiet': True,
         'no_warnings': True,
+        # O pulo do gato: Deixamos SÓ 'android'. Tiramos o 'web' pra ele nem tentar a versão bloqueada.
+        'extractor_args': {'youtube': {'player_client': ['android']}}
     }
 
     if cookie_path:
@@ -41,7 +44,7 @@ def download_video_ytdlp(video_id: str) -> str:
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Baixa o vídeo e extrai as informações para saber o nome exato do arquivo gerado após a junção
+            # Baixa o vídeo e pega o nome final do arquivo gerado
             info_dict = ydl.extract_info(url, download=True)
             downloaded_file = ydl.prepare_filename(info_dict)
             
