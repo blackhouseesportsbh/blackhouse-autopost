@@ -51,7 +51,8 @@ def download_short_mp4(video_id: str) -> str:
             f.write(cookies_content)
     
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
+        # --- AQUI ESTÁ A CORREÇÃO DE FORMATO PARA EVITAR O ERRO DO YT-DLP ---
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': output_filename,
         'merge_output_format': 'mp4',
         'quiet': True,
@@ -120,7 +121,6 @@ def check_new_shorts():
     try:
         res = requests.get(url).json()
         
-        # --- AQUI ESTÁ A ARMADILHA PARA O ERRO ---
         if "error" in res:
             print(f"[!!!] O YOUTUBE RECUSOU A CONEXÃO: {res['error']['message']}", flush=True)
             print(f"      Código do erro: {res['error']['code']}", flush=True)
