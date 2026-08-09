@@ -50,9 +50,9 @@ def download_short_mp4(video_id: str) -> str:
         with open(cookie_path, "w", encoding="utf-8") as f:
             f.write(cookies_content)
     
-    ydl_opts = {
-        # Opção nuclear: pega o melhor arquivo único (MP4) que já tenha vídeo e áudio juntos
-        'format': 'best[ext=mp4]/best',
+     ydl_opts = {
+        # 'best' puro: pega o melhor arquivo de vídeo e áudio combinados, seja ele qual for (mp4, webm, mkv)
+        'format': 'best',
         'outtmpl': output_filename,
         'quiet': True,
         'no_warnings': True
