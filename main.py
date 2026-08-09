@@ -3,7 +3,6 @@ import time
 import threading
 import requests
 import isodate
-import yt_dlp
 from fastapi import FastAPI
 from database import init_db, is_video_processed, mark_video_processed
 
@@ -40,48 +39,36 @@ def is_youtube_short(video_id: str) -> tuple[bool, str]:
 
 def download_short_mp4(video_id: str) -> str:
     output_filename = f"short_{video_id}.mp4"
-    url = f"https://www.youtube.com/shorts/{video_id}"
+    youtube_url = f"https://www.youtube.com/shorts/{video_id}"
     
-    # Se a variável de cookies existir na Railway, grava num arquivo temporário
-    cookie_path = None
-    cookies_content = os.getenv("YOUTUBE_COOKIES", "").strip()
-    if cookies_content:
-        cookie_path = "cookies.txt"
-        with open(cookie_path, "w", encoding="utf-8") as f:
-            f.write(cookies_content)
-    
-    # Opções blindadas para enganar o bloqueio de IP de datacenter do YouTube
-    ydl_opts = {
-        'format': 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'merge_output_format': 'mp4',
-        'outtmpl': output_filename,
-        'quiet': True,
-        'no_warnings': True,
-        # Simula um navegador real do Windows para evitar o bloqueio de "bot"
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-        },
-        # Força o extrator a usar parâmetros de cliente web padrão
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web', 'mweb']
-            }
-        }
+    # Usando a API pública do Cobalt para baixar o vídeo diretamente via HTTP sem precisar de yt-dlp ou cookies
+    cobalt_url = "https://api.cobalt.tools/api/json"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "url": youtube_url,
+        "videoQuality": "max"
     }
     
-    # Se gerou o arquivo de cookies, injeta nas opções
-    if cookie_path and os.path.exists(cookie_path):
-        ydl_opts['cookiefile'] = cookie_path
+    response = requests.post(cobalt_url, json=payload, headers=headers)
+    res_data = response.json()
     
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-    finally:
-        # Remove o arquivo temporário de cookies depois do download
-        if cookie_path and os.path.exists(cookie_path):
-            os.remove(cookie_path)
+    if "url" not in res_data:
+        raise Exception(f"Erro ao obter link de download pela API do Cobalt: {res_data}")
         
+    download_link = res_data["url"]
+    
+    # Baixa o arquivo MP4 do link direto retornado
+    video_res = requests.get(download_link, stream=True)
+    if video_res.status_code != 200:
+        raise Exception(f"Falha ao baixar o arquivo de vídeo do link direto. Status: {video_res.status_code}")
+        
+    with open(output_filename, "wb") as f:
+        for chunk in video_res.iter_content(chunk_size=8192):
+            f.write(chunk)
+            
     return output_filename
 
 def upload_to_tiktok(video_path: str, title: str) -> str:
@@ -166,11 +153,11 @@ def check_new_shorts():
             print(f"   -> [IGNORADO] Não é um Short válido (ou tem mais de 3 minutos).", flush=True)
             continue
 
-        print(f"[+] NOVO SHORT APROVADO: '{short_title}'! Iniciando o yt-dlp blindado para download...", flush=True)
+        print(f"[+] NOVO SHORT APROVADO: '{short_title}'! Iniciando o download via API do Cobalt...", flush=True)
         mp4_file = None
         try:
             mp4_file = download_short_mp4(video_id)
-            print(f"   -> [✓] Download concluído! Iniciando comunicação com a API do TikTok...", flush=True)
+            print(f"   -> [✓] Download concluído com sucesso! Iniciando comunicação com a API do TikTok...", flush=True)
             
             publish_id = upload_to_tiktok(mp4_file, short_title)
             print(f"   -> [✓] Upload feito com sucesso! Salvando no banco de dados...", flush=True)
