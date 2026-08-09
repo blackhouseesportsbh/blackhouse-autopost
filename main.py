@@ -38,7 +38,8 @@ def is_youtube_short(video_id: str) -> tuple[bool, str]:
     
     return is_short, title
 
-def download_short_mp4(video_id: str) -> str:
+
+ def download_short_mp4(video_id: str) -> str:
     output_filename = f"short_{video_id}.mp4"
     url = f"https://www.youtube.com/shorts/{video_id}"
     
@@ -51,9 +52,12 @@ def download_short_mp4(video_id: str) -> str:
             f.write(cookies_content)
     
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
+        'format': 'b/best',
         'outtmpl': output_filename,
-        'merge_output_format': 'mp4',
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
         'quiet': True,
         'no_warnings': True
     }
